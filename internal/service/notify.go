@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/queue"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/google/uuid"
 )
@@ -16,11 +17,12 @@ type NotificationService interface {
 }
 
 type notificationService struct {
-	repo repository.NotificationRepository
+	repo  repository.NotificationRepository
+	queue queue.NotificationQueue
 }
 
-func NewNotificationService(repo repository.NotificationRepository) NotificationService {
-	return &notificationService{repo: repo}
+func NewNotificationService(repo repository.NotificationRepository, q queue.NotificationQueue) NotificationService {
+	return &notificationService{repo: repo, queue: q}
 }
 
 func (s *notificationService) Create(message string, sendAt time.Time) (string, error) {
@@ -34,6 +36,11 @@ func (s *notificationService) Create(message string, sendAt time.Time) (string, 
 	if err := s.repo.Save(n); err != nil {
 		return "", err
 	}
+
+	if err := s.queue.Publish(n); err != nil {
+		return "", err
+	}
+
 	return id, nil
 }
 

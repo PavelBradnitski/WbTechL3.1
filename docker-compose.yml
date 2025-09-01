@@ -13,7 +13,36 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  postgres:
+    image: postgres:15
+    container_name: postgres_notify
+    environment:
+      POSTGRES_USER: notify_user
+      POSTGRES_PASSWORD: notify_pass
+      POSTGRES_DB: notifications
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./internal/db/init:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notify_user -d notifications"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ./internal/migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      postgres:
+        condition: service_healthy
   api:
     build: .
     container_name: notify-api
@@ -23,9 +52,16 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      postgres:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully  
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       QUEUE_NAME: notifications
+      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
+    volumes:
+      - ./internal/migrations:/app/migrations
 
   worker:
     build: .
@@ -34,6 +70,32 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully  
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       QUEUE_NAME: notifications
+      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
+    volumes:
+      - ./internal/migrations:/app/migrations
+  scheduler:
+    build: .
+    container_name: notify-scheduler
+    command: ["./notify-scheduler"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      QUEUE_NAME: notifications
+      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
+    volumes:
+      - ./internal/migrations:/app/migrations
+volumes:
+  pgdata:

@@ -45,7 +45,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	scheduler := service.NewScheduler(svc, rabbit, "notifications", 5*time.Second)
+	scheduler, err := service.NewNotificationScheduler(svc, rabbit, "notifications", 5*time.Second)
+	if err != nil {
+		log.Fatalf("failed to create scheduler: %v", err)
+	}
 	scheduler.Start()
 	defer scheduler.Stop()
 

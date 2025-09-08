@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notification Manager</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"],
+        input[type="email"],
+        textarea,
+        select,
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .notification-row {
+          cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Notification Manager</h1>
+
+        <h2>Create Notification</h2>
+        <form id="notification-form">
+            <div class="form-group">
+                <label for="user_id">User ID:</label>
+                <input type="text" id="user_id" name="user_id">
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email">
+            </div>
+            <div class="form-group">
+                <label for="type">Type:</label>
+                <select id="type" name="type">
+                    <option value="email">Email</option>
+                    <option value="telegram">Telegram</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="subject">Subject:</label>
+                <input type="text" id="subject" name="subject">
+            </div>
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="scheduled_at">Scheduled At:</label>
+                <input type="datetime-local" id="scheduled_at" name="scheduled_at">
+            </div>
+            <button type="button" onclick="createNotification()">Create</button>
+        </form>
+
+        <h2>Notifications</h2>
+        <table id="notification-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User ID</th>
+                    <th>Email</th>
+                    <th>Type</th>
+                    <th>Subject</th>
+                    <th>Message</th>
+                    <th>Scheduled At</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th>Updated At</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Notifications will be dynamically added here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Placeholder API URL - replace with your actual API endpoint
+        const API_URL = 'http://localhost:8081/notify'; // Replace with your API endpoint
+
+        // Function to fetch notifications from the API
+        // todo: fix CORS issue
+        async function getNotifications() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const notifications = await response.json();
+                displayNotifications(notifications);
+            } catch (error) {
+                console.error("Error fetching notifications:", error);
+                alert("Failed to fetch notifications. Check the console for details.");
+            }
+        }
+
+        // Function to display notifications in the table
+        function displayNotifications(notifications) {
+            const tableBody = document.getElementById('notification-table').querySelector('tbody');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            notifications.forEach(notification => {
+                const row = document.createElement('tr');
+                row.classList.add('notification-row');
+                row.setAttribute('data-notification-id', notification.id); // Store ID for potential future use
+
+                row.innerHTML = `
+                    <td>${notification.id}</td>
+                    <td>${notification.user_id}</td>
+                    <td>${notification.email}</td>
+                    <td>${notification.type}</td>
+                    <td>${notification.subject || ''}</td>
+                    <td>${notification.message}</td>
+                    <td>${new Date(notification.scheduled_at).toLocaleString()}</td>
+                    <td>${notification.status}</td>
+                    <td>${new Date(notification.created_at).toLocaleString()}</td>
+                    <td>${new Date(notification.updated_at).toLocaleString()}</td>
+                `;
+                tableBody.appendChild(row);
+
+                // Optional: Add click handler to view more details
+                row.addEventListener('click', () => {
+                   alert(`Notification ID: ${notification.id}\nMore details could be displayed here`);
+                });
+            });
+        }
+
+        // Function to create a new notification
+        async function createNotification() {
+           const form = document.getElementById('notification-form');
+        const formData = new FormData(form);
+
+        // Get local datetime and convert to correct ISO format
+        const localDatetime = formData.get('scheduled_at'); // e.g., "2025-09-01T07:17"
+        const utcDate = new Date(localDatetime);
+        const isoDate = utcDate.toISOString().slice(0, 19) + 'Z'; // e.g., "2025-09-01T07:17:00Z"
+
+        // Convert FormData to JSON
+        const notificationData = {
+            user_id: formData.get('user_id'),
+            email: formData.get('email'),
+            type: formData.get('type'),
+            message: formData.get('message'),
+            subject: formData.get('subject'),
+            scheduled_at: isoDate
+        };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(notificationData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Notification created:', result);
+                alert('Notification created successfully!');
+
+                // Refresh the notification list
+                getNotifications();
+
+                // Clear the form
+                form.reset();
+
+            } catch (error) {
+                console.error("Error creating notification:", error);
+                alert("Failed to create notification. Check the console for details.");
+            }
+        }
+
+        // Initial load of notifications when the page loads
+        window.onload = getNotifications;
+    </script>
+</body>
+</html>

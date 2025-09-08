@@ -1,7 +1,10 @@
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id TEXT NOT NULL,
+    type VARCHAR(20) NOT NULL,             -- канал доставки: email, telegram, sms...
+    user_id TEXT NOT NULL,                 -- идентификатор пользователя (например chat_id в Telegram)
+    email TEXT NOT NULL,                            -- email получателя
     message TEXT NOT NULL,
+    subject TEXT NOT NULL,                        -- тема сообщения (для email) 
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     scheduled_at TIMESTAMPTZ NOT NULL,
     retries INT NOT NULL DEFAULT 0,

@@ -48,7 +48,7 @@ services:
     container_name: notify-api
     command: ["./notify-api"]
     ports:
-      - "8080:8080"
+      - "8081:8081"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -60,6 +60,7 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       QUEUE_NAME: notifications
       POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
+      FRONTEND_URL: http://localhost:8080
     volumes:
       - ./internal/migrations:/app/migrations
 
@@ -78,6 +79,12 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       QUEUE_NAME: notifications
       POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      SMTP_FROM: "no-reply@example.com" 
+      TELEGRAM_TOKEN: 7969503262:AAFLfugCdMvfnDcmHpjy59-ZbEsMYW3cMlc
     volumes:
       - ./internal/migrations:/app/migrations
   scheduler:
@@ -97,5 +104,19 @@ services:
       POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
     volumes:
       - ./internal/migrations:/app/migrations
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI  
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:80"    
 volumes:
   pgdata:

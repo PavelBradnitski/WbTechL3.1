@@ -42,6 +42,11 @@ func main() {
 	if s := os.Getenv("POSTGRES_SLAVE_DSN"); s != "" {
 		slaveDSNs = append(slaveDSNs, s)
 	}
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		log.Printf("Didn't set frontent URL. Set to http://localhost:8080.")
+		frontendURL = "http://localhost:8080"
+	}
 	runMigrations(masterDSN)
 	// создаём подключение через нашу обёртку
 	db, err := dbpg.New(masterDSN, slaveDSNs, &dbpg.Options{
@@ -63,21 +68,10 @@ func main() {
 	r := ginext.New()
 
 	// хендлеры
-	handler.NewNotificationHandler(r, svc)
-	// // создаём планировщик
-	// url := os.Getenv("RABBITMQ_URL")
-	// if url == "" {
-	// 	url = "amqp://guest:guest@localhost:5672/"
-	// }
-	// rabbit, err := rabbitmq.Connect(url, 5, 5*time.Second)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// scheduler := service.NewScheduler(svc, rabbit, "notifications", 5*time.Second)
-	// scheduler.Start()
-	// defer scheduler.Stop()
+	handler.NewNotificationHandler(r, svc, frontendURL)
+
 	// запуск сервера
-	addr := ":8080"
+	addr := ":8081"
 	if envAddr := os.Getenv("HTTP_ADDR"); envAddr != "" {
 		addr = envAddr
 	}

@@ -28,6 +28,6 @@ COPY --from=builder /app/notify-scheduler .
 # Копируем миграции для runtime
 COPY --from=builder /app/internal/migrations ./migrations
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["./notify-api"]

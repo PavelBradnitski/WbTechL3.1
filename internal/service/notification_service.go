@@ -11,11 +11,11 @@ import (
 type NotificationService interface {
 	Create(ctx context.Context, req *models.CreateNotificationRequest) (string, error)
 	Get(ctx context.Context, id string) (*models.Notification, error)
+	GetAll(ctx context.Context) ([]*models.Notification, error)
 	Cancel(ctx context.Context, id string) error
-	GetPendingNotifications(ctx context.Context, limit int) ([]*models.Notification, error)
-	UpdateStatus(ctx context.Context, id, status string, retries int) error
+	ReservePending(ctx context.Context, limit int) ([]*models.Notification, error)
+	UpdateStatus(ctx context.Context, id string, status models.Status) error
 	IncrementRetries(ctx context.Context, id string) error
-	MarkAsSent(ctx context.Context, id string) error
 }
 
 type notificationService struct {
@@ -31,6 +31,9 @@ func (s *notificationService) Create(ctx context.Context, req *models.CreateNoti
 		ID:          uuid.NewString(),
 		UserID:      req.UserID,
 		Message:     req.Message,
+		Subject:     req.Subject,
+		Email:       req.Email,
+		Type:        req.Type,
 		ScheduledAt: req.ScheduledAt,
 		Status:      "scheduled",
 		Retries:     0,
@@ -42,23 +45,23 @@ func (s *notificationService) Get(ctx context.Context, id string) (*models.Notif
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *notificationService) GetAll(ctx context.Context) ([]*models.Notification, error) {
+	return s.repo.GetAll(ctx)
+}
+
 func (s *notificationService) Cancel(ctx context.Context, id string) error {
 	return s.repo.Cancel(ctx, id)
 }
 
-func (s *notificationService) GetPendingNotifications(ctx context.Context, limit int) ([]*models.Notification, error) {
-	// возвращает уведомления со статусом 'pending' и send_at <= now()
-	return s.repo.GetPending(ctx, limit)
+// возвращает уведомления со статусом 'pending' и send_at <= now()
+func (s *notificationService) ReservePending(ctx context.Context, limit int) ([]*models.Notification, error) {
+	return s.repo.ReservePending(ctx, limit)
 }
 
-func (s *notificationService) UpdateStatus(ctx context.Context, id, status string, retries int) error {
+func (s *notificationService) UpdateStatus(ctx context.Context, id string, status models.Status) error {
 	return s.repo.UpdateStatus(ctx, id, status)
 }
 
 func (s *notificationService) IncrementRetries(ctx context.Context, id string) error {
 	return s.repo.IncrementRetries(ctx, id)
-}
-
-func (s *notificationService) MarkAsSent(ctx context.Context, id string) error {
-	return s.repo.UpdateStatus(ctx, id, "sent")
 }

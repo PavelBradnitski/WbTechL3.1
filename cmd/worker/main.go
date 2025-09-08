@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/PavelBradnitski/WbTechL3.1/internal/notifications"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/sender"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/rabbitmq"
@@ -55,16 +55,16 @@ func main() {
 	}
 	defer channel.Close()
 	port, _ := strconv.Atoi(os.Getenv("SMTP_PORT"))
-	emailSender := notifications.NewEmailSender(
+	emailSender := sender.NewEmailSender(
 		os.Getenv("SMTP_HOST"),
 		port,
 		os.Getenv("SMTP_USER"),
 		os.Getenv("SMTP_PASS"),
 		os.Getenv("SMTP_FROM"),
 	)
-	telegramSender := notifications.NewTelegramSender(os.Getenv("TELEGRAM_TOKEN"))
+	telegramSender := sender.NewTelegramSender(os.Getenv("TELEGRAM_TOKEN"))
 
-	sender := notifications.NewMultiSender(emailSender, telegramSender)
+	sender := sender.NewMultiSender(emailSender, telegramSender)
 
 	worker := service.NewWorker(channel, sender, svc)
 	worker.Start()

@@ -1,5 +1,4 @@
-// internal/notifications/email_sender.go
-package notifications
+package sender
 
 import (
 	"fmt"
@@ -8,6 +7,7 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// EmailSender реализует отправку уведомлений по email.
 type EmailSender struct {
 	host     string
 	port     int
@@ -16,6 +16,7 @@ type EmailSender struct {
 	from     string
 }
 
+// NewEmailSender создает новый экземпляр EmailSender.
 func NewEmailSender(host string, port int, username, password, from string) *EmailSender {
 	return &EmailSender{
 		host:     host,
@@ -26,6 +27,7 @@ func NewEmailSender(host string, port int, username, password, from string) *Ema
 	}
 }
 
+// Send отправляет уведомление по email.
 func (s *EmailSender) Send(n *models.Notification) error {
 
 	m := gomail.NewMessage()

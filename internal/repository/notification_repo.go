@@ -8,6 +8,7 @@ import (
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
 )
 
+// NotificationRepository определяет методы для работы с уведомлениями в базе данных.
 type NotificationRepository interface {
 	Create(ctx context.Context, n *models.Notification) (string, error)
 	GetByID(ctx context.Context, id string) (*models.Notification, error)
@@ -22,6 +23,7 @@ type notificationRepo struct {
 	db *sql.DB
 }
 
+// NewNotificationRepo создает новый экземпляр NotificationRepository.
 func NewNotificationRepo(db *sql.DB) NotificationRepository {
 	return &notificationRepo{db: db}
 }

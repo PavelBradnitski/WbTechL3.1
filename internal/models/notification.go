@@ -2,25 +2,33 @@ package models
 
 import "time"
 
+// Status Статус уведомления
 type Status string
 
 const (
-	StatusScheduled  Status = "scheduled"
-	StatusSent       Status = "sent"
-	StatusCanceled   Status = "canceled"
-	StatusFailed     Status = "failed"
+	// StatusScheduled статус при создании
+	StatusScheduled Status = "scheduled"
+	// StatusSent статус после попытки отправки
+	StatusSent Status = "sent"
+	// StatusCanceled статус после отмены
+	StatusCanceled Status = "canceled"
+	// StatusFailed статус после неудачной попытки отправки
+	StatusFailed Status = "failed"
+	// StatusProcessing статус при начале обработки планировщиком
 	StatusProcessing Status = "processing"
 )
 
-// Тип доставки уведомления
+// NotificationType Тип доставки уведомления
 type NotificationType string
 
 const (
-	NotificationTypeEmail    NotificationType = "email"
+	// NotificationTypeEmail константа для email уведомлений
+	NotificationTypeEmail NotificationType = "email"
+	// NotificationTypeTelegram константа для telegram уведомлений
 	NotificationTypeTelegram NotificationType = "telegram"
 )
 
-// Модель для БД (внутренняя)
+// Notification Модель для БД (внутренняя)
 type Notification struct {
 	ID          string           `db:"id"`
 	UserID      string           `db:"user_id"`
@@ -35,7 +43,7 @@ type Notification struct {
 	UpdatedAt   time.Time        `db:"updated_at"`
 }
 
-// DTO для входящих запросов (например, POST /notifications)
+// CreateNotificationRequest DTO для входящих запросов (например, POST /notifications)
 type CreateNotificationRequest struct {
 	UserID      string           `json:"user_id,omitempty"`
 	Email       string           `json:"email,omitempty"`
@@ -45,7 +53,7 @@ type CreateNotificationRequest struct {
 	ScheduledAt time.Time        `json:"scheduled_at"`
 }
 
-// DTO для ответа API
+// NotificationResponse DTO для ответа API
 type NotificationResponse struct {
 	ID          string           `json:"id"`
 	UserID      string           `json:"user_id,omitempty"`
@@ -59,7 +67,7 @@ type NotificationResponse struct {
 	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
-// DTO для ответа на создание
+// CreateNotificationResponse DTO для ответа на создание
 type CreateNotificationResponse struct {
 	ID string `json:"id"`
 }

@@ -10,19 +10,18 @@ import (
 	"github.com/wb-go/wbf/ginext"
 )
 
+// NotificationHandler для работы с уведомлениями
 type NotificationHandler struct {
 	svc service.NotificationService
 }
 
+// NewNotificationHandler создает новый обработчик уведомлений и регистрирует маршруты
 func NewNotificationHandler(r *ginext.Engine, svc service.NotificationService, frontendURL string) {
 	log.Printf("Frontend URL: %s\n", frontendURL)
 	h := &NotificationHandler{svc: svc}
-	// Простая настройка CORS
 	// CORS middleware
 	r.Use(func(c *ginext.Context) {
-		log.Printf("!!!Incoming request: %s %s\n", c.Request.Method, c.Request.URL.Path)
-		log.Printf("!!!Origin header: %s\n", c.Request.Header.Get("Origin"))
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:8080")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
@@ -35,11 +34,12 @@ func NewNotificationHandler(r *ginext.Engine, svc service.NotificationService, f
 		c.Next()
 	})
 	r.POST("/notify", h.create)
+	r.GET("/notify", h.getAll)
 	r.GET("/notify/:id", h.get)
-	r.GET("/notify/All", h.getAll)
 	r.DELETE("/notify/:id", h.cancel)
 }
 
+// create хендлер для создания нового уведомления.
 func (h *NotificationHandler) create(c *ginext.Context) {
 	var req models.CreateNotificationRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -85,6 +85,7 @@ func (h *NotificationHandler) create(c *ginext.Context) {
 	c.JSON(http.StatusOK, models.CreateNotificationResponse{ID: id})
 }
 
+// get хендлер для получения уведомления по ID.
 func (h *NotificationHandler) get(c *ginext.Context) {
 	id := c.Param("id")
 	n, err := h.svc.Get(c.Request.Context(), id)
@@ -107,8 +108,8 @@ func (h *NotificationHandler) get(c *ginext.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// getAll хендлер для получения всех уведомлений.
 func (h *NotificationHandler) getAll(c *ginext.Context) {
-
 	n, err := h.svc.GetAll(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "notifications not found"})
@@ -133,6 +134,7 @@ func (h *NotificationHandler) getAll(c *ginext.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// cancel хендлер для отмены запланированного уведомления.
 func (h *NotificationHandler) cancel(c *ginext.Context) {
 	id := c.Param("id")
 	n, err := h.svc.Get(c.Request.Context(), id)

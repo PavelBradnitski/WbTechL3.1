@@ -8,22 +8,25 @@ import (
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
-	"github.com/PavelBradnitski/WbTechL3.1/internal/notifications"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/sender"
 
 	"github.com/wb-go/wbf/rabbitmq"
 	"github.com/wb-go/wbf/retry"
 )
 
+// Worker отвечает за получение сообщений из очереди и обработку уведомлений.
 type Worker struct {
 	channel *rabbitmq.Channel
-	sender  notifications.Sender
+	sender  sender.Sender
 	service NotificationService
 }
 
-func NewWorker(channel *rabbitmq.Channel, sender notifications.Sender, svc NotificationService) *Worker {
+// NewWorker создает новый экземпляр Worker.
+func NewWorker(channel *rabbitmq.Channel, sender sender.Sender, svc NotificationService) *Worker {
 	return &Worker{channel: channel, sender: sender, service: svc}
 }
 
+// Start запускает обработку сообщений из очереди.
 func (w *Worker) Start() {
 	queueName := os.Getenv("QUEUE_NAME")
 	if queueName == "" {
@@ -33,7 +36,6 @@ func (w *Worker) Start() {
 		Queue:    queueName,
 		Consumer: "worker-1",
 		AutoAck:  false,
-		// остальные поля можно оставить по умолчанию
 	}
 	msgs, err := w.channel.Consume(
 		conf.Queue,

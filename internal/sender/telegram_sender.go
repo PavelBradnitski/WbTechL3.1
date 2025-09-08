@@ -1,4 +1,4 @@
-package notifications
+package sender
 
 import (
 	"bytes"
@@ -10,14 +10,17 @@ import (
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
 )
 
+// TelegramSender реализует отправку уведомлений через Telegram.
 type TelegramSender struct {
 	botToken string
 }
 
+// NewTelegramSender создает новый экземпляр TelegramSender.
 func NewTelegramSender(botToken string) *TelegramSender {
 	return &TelegramSender{botToken: botToken}
 }
 
+// Send отправляет уведомление через Telegram.
 func (s *TelegramSender) Send(n *models.Notification) error {
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.botToken)
 

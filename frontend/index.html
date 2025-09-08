@@ -105,15 +105,16 @@
                     <th>Updated At</th>
                 </tr>
             </thead>
+            <button id="refresh-btn">Update Notification</button>
             <tbody>
                 <!-- Notifications will be dynamically added here -->
             </tbody>
         </table>
     </div>
-
+    
     <script>
         // Placeholder API URL - replace with your actual API endpoint
-        const API_URL = 'http://localhost:8081/notify'; // Replace with your API endpoint
+        const API_URL = 'http://localhost:8081/notify';
 
         // Function to fetch notifications from the API
         // todo: fix CORS issue
@@ -213,6 +214,14 @@
 
         // Initial load of notifications when the page loads
         window.onload = getNotifications;
+
+        // Подключаем кнопку "Обновить"
+        document.addEventListener("DOMContentLoaded", () => {
+            const refreshBtn = document.getElementById("refresh-btn");
+            if (refreshBtn) {
+                refreshBtn.addEventListener("click", getNotifications);
+            }
+        });
     </script>
 </body>
 </html>

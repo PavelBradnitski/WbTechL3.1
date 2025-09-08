@@ -10,11 +10,13 @@ import (
 	"github.com/wb-go/wbf/rabbitmq"
 )
 
+// Scheduler определяет интерфейс для планировщика уведомлений.
 type Scheduler interface {
 	Start()
 	Stop()
 }
 
+// NotificationScheduler отвечает за периодическую проверку базы данных на наличие новых уведомлений
 type NotificationScheduler struct {
 	svc       NotificationService
 	publisher *rabbitmq.Publisher
@@ -24,6 +26,7 @@ type NotificationScheduler struct {
 	cancel    context.CancelFunc
 }
 
+// NewNotificationScheduler создает новый экземпляр NotificationScheduler.
 func NewNotificationScheduler(svc NotificationService, conn *rabbitmq.Connection, queueName string, interval time.Duration) (*NotificationScheduler, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -65,6 +68,7 @@ func NewNotificationScheduler(svc NotificationService, conn *rabbitmq.Connection
 	}, nil
 }
 
+// Start запускает планировщик уведомлений.
 func (s *NotificationScheduler) Start() {
 	ticker := time.NewTicker(s.interval)
 	go func() {
@@ -80,6 +84,7 @@ func (s *NotificationScheduler) Start() {
 	}()
 }
 
+// Stop останавливает планировщик уведомлений.
 func (s *NotificationScheduler) Stop() {
 	s.cancel()
 }

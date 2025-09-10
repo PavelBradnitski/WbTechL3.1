@@ -123,7 +123,7 @@ func (r *notificationRepo) ReservePending(ctx context.Context, limit int) ([]*mo
 	}
 	defer rows.Close()
 
-	var notifications []*models.Notification
+	notifications := []*models.Notification{}
 	for rows.Next() {
 		var n models.Notification
 		if err := rows.Scan(

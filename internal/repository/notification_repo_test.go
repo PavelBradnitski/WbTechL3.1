@@ -393,3 +393,440 @@ func TestNotificationRepo_GetAll(t *testing.T) {
 		}
 	})
 }
+
+func TestNotificationRepo_Cancel(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		notificationID := "notification123"
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+   UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2
+  `)).
+			WithArgs(models.StatusCanceled, notificationID).
+			WillReturnResult(sqlmock.NewResult(1, 1)) // 1 row affected
+
+		err = repo.Cancel(context.Background(), notificationID)
+
+		assert.NoError(t, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		notificationID := "nonexistent_notification"
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+   UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2
+  `)).
+			WithArgs(models.StatusCanceled, notificationID).
+			WillReturnResult(sqlmock.NewResult(0, 0)) // 0 rows affected
+
+		err = repo.Cancel(context.Background(), notificationID)
+
+		assert.NoError(t, err) // No error expected even if not found
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		notificationID := "notification123"
+
+		mock.ExpectExec(regexp.QuoteMeta(`
+   UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2
+  `)).
+			WithArgs(models.StatusCanceled, notificationID).
+			WillReturnError(errors.New("database error"))
+
+		err = repo.Cancel(context.Background(), notificationID)
+
+		assert.Error(t, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestNotificationRepo_ReservePending(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		limit := 2
+		expectedNotifications := []*models.Notification{
+			{
+				ID:          "notification1",
+				UserID:      "user1",
+				Email:       "test1@example.com",
+				Type:        "email",
+				Message:     "Message 1",
+				Subject:     "Subject 1",
+				Status:      models.StatusProcessing, // IMPORTANT: Should now be processing
+				ScheduledAt: time.Now().Add(time.Hour),
+				Retries:     0,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			{
+				ID:          "notification2",
+				UserID:      "user2",
+				Email:       "test2@example.com",
+				Type:        "sms",
+				Message:     "Message 2",
+				Subject:     "Subject 2",
+				Status:      models.StatusProcessing, // IMPORTANT: Should now be processing
+				ScheduledAt: time.Now().Add(2 * time.Hour),
+				Retries:     1,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		}
+
+		rows := sqlmock.NewRows([]string{"id", "user_id", "email", "type", "message", "subject", "status", "scheduled_at", "retries", "created_at", "updated_at"})
+		for _, n := range expectedNotifications {
+			rows.AddRow(
+				n.ID,
+				n.UserID,
+				n.Email,
+				n.Type,
+				n.Message,
+				n.Subject,
+				n.Status,
+				n.ScheduledAt,
+				n.Retries,
+				n.CreatedAt,
+				n.UpdatedAt,
+			)
+		}
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+			WITH cte AS (
+				SELECT id
+				FROM notifications
+				WHERE status = 'pending'
+				ORDER BY scheduled_at
+				LIMIT $1
+				FOR UPDATE SKIP LOCKED
+			)
+			UPDATE notifications n
+			SET status = $2,
+				updated_at = now()
+			FROM cte
+			WHERE n.id = cte.id
+			RETURNING n.id, n.user_id, n.email, n.type, n.message, n.subject, n.status, n.scheduled_at, n.retries, n.created_at, n.updated_at;
+		`)).
+			WithArgs(limit, models.StatusProcessing).
+			WillReturnRows(rows)
+
+		notifications, err := repo.ReservePending(context.Background(), limit)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, notifications)
+		assert.Equal(t, expectedNotifications, notifications)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("NoPendingNotifications", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		limit := 2
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+			WITH cte AS (
+				SELECT id
+				FROM notifications
+				WHERE status = 'pending'
+				ORDER BY scheduled_at
+				LIMIT $1
+				FOR UPDATE SKIP LOCKED
+			)
+			UPDATE notifications n
+			SET status = $2,
+				updated_at = now()
+			FROM cte
+			WHERE n.id = cte.id
+			RETURNING n.id, n.user_id, n.email, n.type, n.message, n.subject, n.status, n.scheduled_at, n.retries, n.created_at, n.updated_at;
+		`)).
+			WithArgs(limit, models.StatusProcessing).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "email", "type", "message", "subject", "status", "scheduled_at", "retries", "created_at", "updated_at"})) // Empty result set
+
+		notifications, err := repo.ReservePending(context.Background(), limit)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, notifications)
+		assert.Empty(t, notifications)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		limit := 2
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+			WITH cte AS (
+				SELECT id
+				FROM notifications
+				WHERE status = 'pending'
+				ORDER BY scheduled_at
+				LIMIT $1
+				FOR UPDATE SKIP LOCKED
+			)
+			UPDATE notifications n
+			SET status = $2,
+				updated_at = now()
+			FROM cte
+			WHERE n.id = cte.id
+			RETURNING n.id, n.user_id, n.email, n.type, n.message, n.subject, n.status, n.scheduled_at, n.retries, n.created_at, n.updated_at;
+		`)).
+			WithArgs(limit, models.StatusProcessing).
+			WillReturnError(errors.New("database error"))
+
+		notifications, err := repo.ReservePending(context.Background(), limit)
+
+		assert.Error(t, err)
+		assert.Nil(t, notifications)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("ScanError", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := NewNotificationRepo(db)
+
+		limit := 2
+
+		rows := sqlmock.NewRows([]string{"id", "user_id", "email", "type", "message", "subject", "status", "scheduled_at", "retries", "created_at", "updated_at"}).
+			AddRow("notification1", "user1", "test1@example.com", "email", "Message 1", "Subject 1", 123, time.Now().Add(time.Hour), 0, time.Now(), time.Now()) // Invalid status (int instead of string)
+
+		mock.ExpectQuery(regexp.QuoteMeta(`
+   WITH cte AS (
+    SELECT id
+    FROM notifications
+    WHERE status = 'pending'
+    ORDER BY scheduled_at
+    LIMIT $1
+    FOR UPDATE SKIP LOCKED
+   )
+   UPDATE notifications n
+   SET status = $2,
+    updated_at = now()
+   FROM cte
+   WHERE n.id = cte.id
+   RETURNING n.id, n.user_id, n.email, n.type, n.message, n.subject, n.status, n.scheduled_at, n.retries, n.created_at, n.updated_at;
+  `)).
+			WithArgs(limit, models.StatusProcessing).
+			WillReturnRows(rows)
+
+		notifications, err := repo.ReservePending(context.Background(), limit)
+
+		assert.Error(t, err) // Expect scan error
+		assert.Nil(t, notifications)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+}
+
+func TestIncrementRetriesWithSqlmock(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db} // Используем созданный mock db
+		notificationID := "notification123"
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET retries = retries+1, updated_at=now() WHERE id=$1`)).
+			WithArgs(notificationID).
+			WillReturnResult(sqlmock.NewResult(1, 1)) // 1 row affected
+
+		err = repo.IncrementRetries(context.Background(), notificationID)
+		assert.NoError(t, err)
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db} // Используем созданный mock db
+		notificationID := "notification123"
+		expectedError := errors.New("database error")
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET retries = retries+1, updated_at=now() WHERE id=$1`)).
+			WithArgs(notificationID).
+			WillReturnError(expectedError) // Simulate an error
+
+		err = repo.IncrementRetries(context.Background(), notificationID)
+		assert.Error(t, err)
+		assert.Equal(t, expectedError, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("No Rows Affected", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db}
+		notificationID := "notification123"
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET retries = retries+1, updated_at=now() WHERE id=$1`)).
+			WithArgs(notificationID).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+
+		err = repo.IncrementRetries(context.Background(), notificationID)
+
+		// No error is returned if no rows are affected.  It is a success case that no records matched.
+		assert.NoError(t, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestUpdateStatusWithSqlmock(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db}
+		notificationID := "notification123"
+		newStatus := models.StatusSent
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2`)).
+			WithArgs(newStatus, notificationID).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err = repo.UpdateStatus(context.Background(), notificationID, newStatus)
+		assert.NoError(t, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db}
+		notificationID := "notification123"
+		newStatus := models.StatusFailed
+		expectedError := errors.New("database error")
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2`)).
+			WithArgs(newStatus, notificationID).
+			WillReturnError(expectedError)
+
+		err = repo.UpdateStatus(context.Background(), notificationID, newStatus)
+		assert.Error(t, err)
+		assert.Equal(t, expectedError, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("No Rows Affected", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("failed to create mock database connection: %v", err)
+		}
+		defer db.Close()
+
+		repo := &notificationRepo{db: db}
+		notificationID := "notification123"
+		newStatus := models.StatusCanceled
+
+		mock.ExpectExec(regexp.QuoteMeta(`UPDATE notifications SET status=$1, updated_at=now() WHERE id=$2`)).
+			WithArgs(newStatus, notificationID).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+
+		err = repo.UpdateStatus(context.Background(), notificationID, newStatus)
+		assert.NoError(t, err)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}

@@ -84,7 +84,8 @@ func (w *Worker) Start() {
 				}
 				return nil
 			}
-			if n.Type == "email" {
+			switch n.Type {
+			case "email":
 				// Отправляем email
 				if err := w.sender.Send(&n); err != nil {
 					log.Printf("failed to send email: %v", err)
@@ -94,7 +95,7 @@ func (w *Worker) Start() {
 					return err
 				}
 
-			} else if n.Type == "telegram" {
+			case "telegram":
 				// Отправляем telegram
 				if err := w.sender.Send(&n); err != nil {
 					log.Printf("failed to send telegram: %v", err)

@@ -71,7 +71,7 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 		SELECT id, user_id, email, type, message, subject, status, scheduled_at, retries, created_at, updated_at
 		FROM notifications
 	`
-	var n []*models.Notification
+	notifications := []*models.Notification{}
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("error querying notifications: %v", err)
@@ -87,10 +87,10 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 			log.Printf("error scanning notification: %v", err)
 			return nil, err
 		}
-		n = append(n, &notif)
+		notifications = append(notifications, &notif)
 	}
 
-	return n, nil
+	return notifications, nil
 }
 
 func (r *notificationRepo) Cancel(ctx context.Context, id string) error {

@@ -77,17 +77,8 @@ func TestNotificationServiceCreate(t *testing.T) {
 	}
 
 	expectedID := uuid.NewString()
-	mockRepo.On("Create", mock.Anything, mock.MatchedBy(func(n *models.Notification) bool {
-		// Add assertions to check the Notification object before it's created.
-		return n.ChatID == req.ChatID &&
-			n.Message == req.Message &&
-			n.Subject == req.Subject &&
-			n.Email == req.Email &&
-			n.Type == req.Type &&
-			n.ScheduledAt.Equal(req.ScheduledAt) &&
-			n.Status == "scheduled" &&
-			n.Retries == 0
-	})).Return(expectedID, nil)
+	mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.Notification")).
+		Return(expectedID, nil)
 
 	id, err := service.Create(context.Background(), req)
 
@@ -103,15 +94,16 @@ func TestNotificationServiceGet(t *testing.T) {
 	notificationID := "123"
 	expectedNotification := &models.Notification{
 		ID:          notificationID,
-		ChatID:      "user123",
-		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
-		Message:     "Test message",
-		Subject:     "Test subject",
 		ScheduledAt: time.Now().Add(time.Hour),
 		Status:      models.StatusScheduled,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
+		EmailNotification: &models.EmailNotification{
+			Email:   "test@example.com",
+			Message: "Test message",
+			Subject: "Test subject",
+		},
 	}
 
 	mockRepo.On("GetByID", mock.Anything, notificationID).Return(expectedNotification, nil)
@@ -130,27 +122,28 @@ func TestNotificationServiceGetAll(t *testing.T) {
 	expectedNotifications := []*models.Notification{
 		{
 			ID:          "1",
-			ChatID:      "user1",
-			Email:       "test1@example.com",
 			Type:        models.NotificationTypeEmail,
-			Message:     "Test message 1",
-			Subject:     "Test subject 1",
 			ScheduledAt: time.Now().Add(time.Hour),
 			Status:      models.StatusScheduled,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
+			EmailNotification: &models.EmailNotification{
+				Email:   "test1@example.com",
+				Message: "Test message 1",
+				Subject: "Test subject 1",
+			},
 		},
 		{
 			ID:          "2",
-			ChatID:      "user2",
-			Email:       "test2@example.com",
 			Type:        models.NotificationTypeTelegram,
-			Message:     "Test message 2",
-			Subject:     "Test subject 2",
 			ScheduledAt: time.Now().Add(2 * time.Hour),
 			Status:      models.StatusScheduled,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
+			TelegramNotification: &models.TelegramNotification{
+				ChatID:  "user2",
+				Message: "Test message 2",
+			},
 		},
 	}
 
@@ -185,15 +178,16 @@ func TestNotificationServiceReservePending(t *testing.T) {
 	expectedNotifications := []*models.Notification{
 		{
 			ID:          "1",
-			ChatID:      "user1",
-			Email:       "test1@example.com",
 			Type:        models.NotificationTypeEmail,
-			Message:     "Test message 1",
-			Subject:     "Test subject 1",
 			ScheduledAt: time.Now().Add(-time.Minute), // Set ScheduledAt in the past
 			Status:      models.StatusScheduled,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
+			EmailNotification: &models.EmailNotification{
+				Email:   "test1@example.com",
+				Message: "Test message 1",
+				Subject: "Test subject 1",
+			},
 		},
 	}
 

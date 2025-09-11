@@ -1,3 +1,4 @@
+
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -5,21 +6,15 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
   postgres:
     image: postgres:15
     container_name: postgres_notify
-    environment:
-      POSTGRES_USER: notify_user
-      POSTGRES_PASSWORD: notify_pass
-      POSTGRES_DB: notifications
     ports:
       - "5432:5432"
     volumes:
@@ -31,6 +26,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
   migrate:
     image: migrate/migrate
     volumes:
@@ -43,6 +39,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
   api:
     build: .
     container_name: notify-api
@@ -55,12 +52,7 @@ services:
       postgres:
         condition: service_started
       migrate:
-        condition: service_completed_successfully  
-    environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      QUEUE_NAME: notifications
-      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
-      FRONTEND_URL: http://localhost:8080
+        condition: service_completed_successfully
     volumes:
       - ./internal/migrations:/app/migrations
 
@@ -74,19 +66,10 @@ services:
       postgres:
         condition: service_healthy
       migrate:
-        condition: service_completed_successfully  
-    environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      QUEUE_NAME: notifications
-      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
-      SMTP_HOST: mailhog
-      SMTP_PORT: 1025
-      SMTP_USER: ""
-      SMTP_PASS: ""
-      SMTP_FROM: "no-reply@example.com" 
-      TELEGRAM_TOKEN: 7969503262:AAFLfugCdMvfnDcmHpjy59-ZbEsMYW3cMlc
+        condition: service_completed_successfully
     volumes:
       - ./internal/migrations:/app/migrations
+
   scheduler:
     build: .
     container_name: notify-scheduler
@@ -98,10 +81,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      QUEUE_NAME: notifications
-      POSTGRES_MASTER_DSN: postgres://notify_user:notify_pass@postgres:5432/notifications?sslmode=disable
     volumes:
       - ./internal/migrations:/app/migrations
 
@@ -109,14 +88,16 @@ services:
     image: mailhog/mailhog
     container_name: mailhog
     ports:
-      - "1025:1025" # SMTP
-      - "8025:8025" # Web UI  
+      - "1025:1025"
+      - "8025:8025"
+
   frontend:
     build:
       context: .
       dockerfile: frontend.Dockerfile
     container_name: frontend
     ports:
-      - "8080:80"    
+      - "8080:80"
+
 volumes:
   pgdata:

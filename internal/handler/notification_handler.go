@@ -21,7 +21,7 @@ func NewNotificationHandler(r *ginext.Engine, svc service.NotificationService, f
 	h := &NotificationHandler{svc: svc}
 	// CORS middleware
 	r.Use(func(c *ginext.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:8080")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", frontendURL)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
@@ -57,7 +57,7 @@ func (h *NotificationHandler) create(c *ginext.Context) {
 	}
 
 	if req.Type == models.NotificationTypeTelegram && req.ChatID == "" {
-		c.JSON(http.StatusBadRequest, map[string]any{"error": "user_id is required for telegram notifications"})
+		c.JSON(http.StatusBadRequest, map[string]any{"error": "chat_id is required for telegram notifications"})
 		return
 	}
 
@@ -94,22 +94,29 @@ func (h *NotificationHandler) get(c *ginext.Context) {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "notification not found"})
 		return
 	}
-	var message string
+	var resp models.NotificationResponse
 	switch n.Type {
-	case "email":
-		message = n.EmailNotification.Message
-	case "telegram":
-		message = n.TelegramNotification.Message
-	}
-	resp := models.NotificationResponse{
-		ID:          n.ID,
-		ChatID:      n.ChatID,
-		Email:       n.Email,
-		Type:        n.Type,
-		Message:     message,
-		Subject:     n.Subject,
-		ScheduledAt: n.ScheduledAt,
-		Status:      n.Status,
+	case models.NotificationTypeEmail:
+		resp = models.NotificationResponse{
+			ID:          n.ID,
+			Email:       n.EmailNotification.Email,
+			Type:        n.Type,
+			Message:     n.EmailNotification.Message,
+			Subject:     n.EmailNotification.Subject,
+			ScheduledAt: n.ScheduledAt,
+			Status:      n.Status,
+			Retries:     n.Retries,
+		}
+	case models.NotificationTypeTelegram:
+		resp = models.NotificationResponse{
+			ID:          n.ID,
+			ChatID:      n.TelegramNotification.ChatID,
+			Type:        n.Type,
+			Message:     n.TelegramNotification.Message,
+			ScheduledAt: n.ScheduledAt,
+			Status:      n.Status,
+			Retries:     n.Retries,
+		}
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -123,23 +130,31 @@ func (h *NotificationHandler) getAll(c *ginext.Context) {
 	}
 	var resp []models.NotificationResponse
 	for _, notif := range n {
-		var message string
+		var response models.NotificationResponse
 		switch notif.Type {
-		case "email":
-			message = notif.EmailNotification.Message
-		case "telegram":
-			message = notif.TelegramNotification.Message
+		case models.NotificationTypeEmail:
+			response = models.NotificationResponse{
+				ID:          notif.ID,
+				Email:       notif.EmailNotification.Email,
+				Type:        notif.Type,
+				Message:     notif.EmailNotification.Message,
+				Subject:     notif.EmailNotification.Subject,
+				ScheduledAt: notif.ScheduledAt,
+				Status:      notif.Status,
+				Retries:     notif.Retries,
+			}
+		case models.NotificationTypeTelegram:
+			response = models.NotificationResponse{
+				ID:          notif.ID,
+				ChatID:      notif.TelegramNotification.ChatID,
+				Type:        notif.Type,
+				Message:     notif.TelegramNotification.Message,
+				ScheduledAt: notif.ScheduledAt,
+				Status:      notif.Status,
+				Retries:     notif.Retries,
+			}
 		}
-		resp = append(resp, models.NotificationResponse{
-			ID:          notif.ID,
-			ChatID:      notif.ChatID,
-			Email:       notif.Email,
-			Type:        notif.Type,
-			Message:     message,
-			Subject:     notif.Subject,
-			ScheduledAt: notif.ScheduledAt,
-			Status:      notif.Status,
-		})
+		resp = append(resp, response)
 	}
 
 	c.JSON(http.StatusOK, resp)

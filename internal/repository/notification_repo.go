@@ -40,12 +40,12 @@ func (r *notificationRepo) Create(ctx context.Context, req *models.Notification)
 
 	// 1. Вставляем данные в таблицу notifications
 	notificationQuery := `
-  INSERT INTO notifications (type, status, scheduled_at)
-  VALUES ($1, $2, $3)
+  INSERT INTO notifications (type, status, scheduled_at, retries)
+  VALUES ($1, $2, $3, $4)
   RETURNING id
  `
 	var notificationID string
-	err = tx.QueryRowContext(ctx, notificationQuery, req.Type, req.Status, req.ScheduledAt).Scan(&notificationID)
+	err = tx.QueryRowContext(ctx, notificationQuery, req.Type, req.Status, req.ScheduledAt, req.Retries).Scan(&notificationID)
 	if err != nil {
 		return "", fmt.Errorf("error inserting into notifications: %w", err)
 	}
@@ -58,7 +58,7 @@ func (r *notificationRepo) Create(ctx context.Context, req *models.Notification)
    INSERT INTO email_notifications (id, notification_id, email, subject, message)
    VALUES ($1, $2, $3, $4, $5)
   `
-		_, err = tx.ExecContext(ctx, emailQuery, emailID, notificationID, req.Email, req.Subject, req.EmailNotification.Message)
+		_, err = tx.ExecContext(ctx, emailQuery, emailID, notificationID, req.EmailNotification.Email, req.EmailNotification.Subject, req.EmailNotification.Message)
 		if err != nil {
 			return "", fmt.Errorf("error inserting into email_notifications: %w", err)
 		}
@@ -68,7 +68,7 @@ func (r *notificationRepo) Create(ctx context.Context, req *models.Notification)
    INSERT INTO telegram_notifications (id, notification_id, chat_id, message)
    VALUES ($1, $2, $3, $4)
   `
-		_, err = tx.ExecContext(ctx, telegramQuery, telegramID, notificationID, req.ChatID, req.TelegramNotification.Message)
+		_, err = tx.ExecContext(ctx, telegramQuery, telegramID, notificationID, req.TelegramNotification.ChatID, req.TelegramNotification.Message)
 		if err != nil {
 			return "", fmt.Errorf("error inserting into telegram_notifications: %w", err)
 		}
@@ -89,13 +89,13 @@ func (r *notificationRepo) Create(ctx context.Context, req *models.Notification)
 func (r *notificationRepo) GetByID(ctx context.Context, id string) (*models.Notification, error) {
 	// 1. Получаем данные из таблицы notifications
 	notificationQuery := `
-        SELECT id, type, status, scheduled_at
+        SELECT id, type, status, scheduled_at, retries
         FROM notifications
         WHERE id = $1
     `
 	var n models.Notification
 	err := r.db.QueryRowContext(ctx, notificationQuery, id).Scan(
-		&n.ID, &n.Type, &n.Status, &n.ScheduledAt,
+		&n.ID, &n.Type, &n.Status, &n.ScheduledAt, &n.Retries,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting notification by id: %w", err)
@@ -104,25 +104,27 @@ func (r *notificationRepo) GetByID(ctx context.Context, id string) (*models.Noti
 	// 2. В зависимости от типа уведомления, получаем дополнительные данные из соответствующей таблицы
 	switch n.Type {
 	case "email":
+		n.EmailNotification = &models.EmailNotification{}
 		emailQuery := `
             SELECT email, subject, message
             FROM email_notifications
             WHERE notification_id = $1
         `
 		err = r.db.QueryRowContext(ctx, emailQuery, id).Scan(
-			&n.Email, &n.Subject, &n.EmailNotification.Message,
+			&n.EmailNotification.Email, &n.EmailNotification.Subject, &n.EmailNotification.Message,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting email notification details: %w", err)
 		}
 	case "telegram":
+		n.TelegramNotification = &models.TelegramNotification{}
 		telegramQuery := `
             SELECT chat_id, message
             FROM telegram_notifications
             WHERE notification_id = $1
         `
 		err = r.db.QueryRowContext(ctx, telegramQuery, id).Scan(
-			&n.ChatID, &n.TelegramNotification.Message,
+			&n.TelegramNotification.ChatID, &n.TelegramNotification.Message,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting telegram notification details: %w", err)
@@ -139,7 +141,7 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 
 	// 1. Получаем базовую информацию из таблицы notifications
 	notificationQuery := `
-        SELECT id, type, status, scheduled_at
+        SELECT id, type, status, scheduled_at, retries
         FROM notifications
     `
 	rows, err := r.db.QueryContext(ctx, notificationQuery)
@@ -152,7 +154,7 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 	for rows.Next() {
 		var notif models.Notification
 		err := rows.Scan(
-			&notif.ID, &notif.Type, &notif.Status, &notif.ScheduledAt,
+			&notif.ID, &notif.Type, &notif.Status, &notif.ScheduledAt, &notif.Retries,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning notification: %w", err)
@@ -161,25 +163,27 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 		// 2. Получаем дополнительную информацию в зависимости от типа уведомления
 		switch notif.Type {
 		case "email":
+			notif.EmailNotification = &models.EmailNotification{}
 			emailQuery := `
                 SELECT email, subject, message
                 FROM email_notifications
                 WHERE notification_id = $1
             `
 			err = r.db.QueryRowContext(ctx, emailQuery, notif.ID).Scan(
-				&notif.Email, &notif.Subject, &notif.EmailNotification.Message,
+				&notif.EmailNotification.Email, &notif.EmailNotification.Subject, &notif.EmailNotification.Message,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("error getting email notification details: %w", err)
 			}
 		case "telegram":
+			notif.TelegramNotification = &models.TelegramNotification{}
 			telegramQuery := `
                 SELECT chat_id, message
                 FROM telegram_notifications
                 WHERE notification_id = $1
             `
 			err = r.db.QueryRowContext(ctx, telegramQuery, notif.ID).Scan(
-				&notif.ChatID, &notif.TelegramNotification.Message,
+				&notif.TelegramNotification.ChatID, &notif.TelegramNotification.Message,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("error getting telegram notification details: %w", err)
@@ -209,19 +213,19 @@ func (r *notificationRepo) ReservePending(ctx context.Context, limit int) ([]*mo
   WITH selected_notifications AS (
    SELECT id
    FROM notifications
-   WHERE status = 'scheduled'  -- Assuming 'scheduled' is the correct pending status
+   WHERE status = $1 
    ORDER BY scheduled_at
-   LIMIT $1
+   LIMIT $2
    FOR UPDATE SKIP LOCKED
   )
   UPDATE notifications
-  SET status = 'processing',  -- Assuming 'processing' is the correct in-progress status
+  SET status = $3,  
    updated_at = NOW()
   WHERE id IN (SELECT id FROM selected_notifications)
   RETURNING id, type, status, scheduled_at, retries, created_at, updated_at;
  `
 
-	rows, err := r.db.QueryContext(ctx, query, limit)
+	rows, err := r.db.QueryContext(ctx, query, models.StatusScheduled, limit, models.StatusProcessing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query for pending notifications: %w", err)
 	}
@@ -243,12 +247,14 @@ func (r *notificationRepo) ReservePending(ctx context.Context, limit int) ([]*mo
 			if err != nil {
 				return nil, fmt.Errorf("failed to get email notification details: %w", err)
 			}
+			log.Println("Email notification details:", emailNotification)
 			n.EmailNotification = emailNotification
 		case "telegram":
 			telegramNotification, err := r.getTelegramNotificationDetails(ctx, n.ID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get telegram notification details: %w", err)
 			}
+			log.Println("Telegram notification details:", telegramNotification)
 			n.TelegramNotification = telegramNotification
 		default:
 			return nil, fmt.Errorf("unknown notification type: %s", n.Type)
@@ -305,45 +311,6 @@ func (r *notificationRepo) getTelegramNotificationDetails(ctx context.Context, n
 
 	return telegramNotification, nil
 }
-
-// // todo: rewrite to new database
-// func (r *notificationRepo) ReservePending(ctx context.Context, limit int) ([]*models.Notification, error) {
-// 	query := `
-//         WITH cte AS (
-//             SELECT id
-//             FROM notifications
-//             WHERE status = 'pending'
-//             ORDER BY scheduled_at
-//             LIMIT $1
-//             FOR UPDATE SKIP LOCKED
-//         )
-//         UPDATE notifications n
-//         SET status = $2,
-//             updated_at = now()
-//         FROM cte
-//         WHERE n.id = cte.id
-//         RETURNING n.id, n.chat_id, n.email, n.type, n.message, n.subject, n.status, n.scheduled_at, n.retries, n.created_at, n.updated_at;
-//     `
-
-// 	rows, err := r.db.QueryContext(ctx, query, limit, models.StatusProcessing)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-
-// 	notifications := []*models.Notification{}
-// 	for rows.Next() {
-// 		var n models.Notification
-// 		if err := rows.Scan(
-// 			&n.ID, &n.ChatID, &n.Email, &n.Type, &n.Message, &n.Subject, &n.Status,
-// 			&n.ScheduledAt, &n.Retries, &n.CreatedAt, &n.UpdatedAt,
-// 		); err != nil {
-// 			return nil, err
-// 		}
-// 		notifications = append(notifications, &n)
-// 	}
-// 	return notifications, nil
-// }
 
 func (r *notificationRepo) IncrementRetries(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE notifications SET retries = retries+1, updated_at=now() WHERE id=$1`, id)

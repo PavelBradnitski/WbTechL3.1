@@ -30,15 +30,15 @@ const (
 
 // Notification Модель для БД (внутренняя)
 type Notification struct {
-	ID                    string           `db:"id"`
-	Type                  NotificationType `db:"type"`
-	Status                Status           `db:"status"`
-	ScheduledAt           time.Time        `db:"scheduled_at"`
-	Retries               int              `db:"retries"`
-	CreatedAt             time.Time        `db:"created_at"`
-	UpdatedAt             time.Time        `db:"updated_at"`
-	*EmailNotification    `db:"email_notifications"`
-	*TelegramNotification `db:"telegram_notifications"`
+	ID                   string                `db:"id"`
+	Type                 NotificationType      `db:"type"`
+	Status               Status                `db:"status"`
+	ScheduledAt          time.Time             `db:"scheduled_at"`
+	Retries              int                   `db:"retries"`
+	CreatedAt            time.Time             `db:"created_at"`
+	UpdatedAt            time.Time             `db:"updated_at"`
+	EmailNotification    *EmailNotification    `db:"email_notifications" json:"email_notification,omitempty"`
+	TelegramNotification *TelegramNotification `db:"telegram_notifications" json:"telegram_notification,omitempty"`
 }
 
 type EmailNotification struct {
@@ -76,6 +76,7 @@ type NotificationResponse struct {
 	Subject     string           `json:"subject,omitempty"`
 	ScheduledAt time.Time        `json:"scheduled_at"`
 	Status      Status           `json:"status"`
+	Retries     int              `json:"retries"`
 }
 
 // CreateNotificationResponse DTO для ответа на создание

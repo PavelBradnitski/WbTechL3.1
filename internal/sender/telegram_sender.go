@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
@@ -23,9 +24,10 @@ func NewTelegramSender(botToken string) *TelegramSender {
 // Send отправляет уведомление через Telegram.
 func (s *TelegramSender) Send(n *models.Notification) error {
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.botToken)
-
+	log.Printf("Sending Telegram message %v\n", n)
+	log.Printf("Chat ID: %s text: %v\n", n.TelegramNotification.ChatID, n.TelegramNotification.Message)
 	payload := map[string]string{
-		"chat_id": n.ChatID,
+		"chat_id": n.TelegramNotification.ChatID,
 		"text":    n.TelegramNotification.Message,
 	}
 

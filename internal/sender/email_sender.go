@@ -32,8 +32,8 @@ func (s *EmailSender) Send(n *models.Notification) error {
 
 	m := gomail.NewMessage()
 	m.SetHeader("From", s.from)
-	m.SetHeader("To", n.Email)
-	m.SetHeader("Subject", n.Subject)
+	m.SetHeader("To", n.EmailNotification.Email)
+	m.SetHeader("Subject", n.EmailNotification.Subject)
 	m.SetBody("text/plain", n.EmailNotification.Message)
 
 	d := gomail.NewDialer(s.host, s.port, s.username, s.password)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"github.com/wb-go/wbf/ginext"
@@ -17,6 +18,13 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/wb-go/wbf/dbpg"
 )
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("No .env file found or error loading it: %v", err)
+	}
+}
 
 func runMigrations(dsn string) {
 	m, err := migrate.New(

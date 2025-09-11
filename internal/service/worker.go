@@ -105,7 +105,6 @@ func (w *Worker) Start() {
 					return err
 				}
 			}
-			log.Printf("sent notification id=%v message=%q", n.ID, n.TelegramNotification.Message)
 			return nil
 		}, strat)
 		if err != nil {

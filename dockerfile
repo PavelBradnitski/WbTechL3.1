@@ -27,6 +27,8 @@ COPY --from=builder /app/notify-scheduler .
 
 # Копируем миграции для runtime
 COPY --from=builder /app/internal/migrations ./migrations
+# Копируем .env для runtime
+COPY .env .env
 
 EXPOSE 8081
 

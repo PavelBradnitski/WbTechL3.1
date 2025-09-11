@@ -10,9 +10,17 @@ import (
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/sender"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
+	"github.com/joho/godotenv"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/rabbitmq"
 )
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("No .env file found or error loading it: %v", err)
+	}
+}
 
 func main() {
 	url := os.Getenv("RABBITMQ_URL")

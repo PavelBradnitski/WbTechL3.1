@@ -188,8 +188,8 @@ func TestCreateNotificationHandlerMissingEmail(t *testing.T) {
 	mockService.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
 
-// TestCreateNotificationHandlerMissingUserID - Тест с отсутствующим user_id для telegram-уведомления
-func TestCreateNotificationHandlerMissingUserID(t *testing.T) {
+// TestCreateNotificationHandlerMissingChatID - Тест с отсутствующим user_id для telegram-уведомления
+func TestCreateNotificationHandlerMissingChatID(t *testing.T) {
 	// Setup
 	mockService := new(MockNotificationService)
 	handler := &NotificationHandler{svc: mockService}
@@ -330,7 +330,7 @@ func TestGetNotificationHandlerSuccess(t *testing.T) {
 	notificationID := "123"
 	expectedNotification := &models.Notification{
 		ID:          notificationID,
-		UserID:      "user123",
+		ChatID:      "user123",
 		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
 		Message:     "Test message",
@@ -354,7 +354,7 @@ func TestGetNotificationHandlerSuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, expectedNotification.ID, response.ID)
-	assert.Equal(t, expectedNotification.UserID, response.UserID)
+	assert.Equal(t, expectedNotification.ChatID, response.ChatID)
 	assert.Equal(t, expectedNotification.Email, response.Email)
 	assert.Equal(t, expectedNotification.Type, response.Type)
 	assert.Equal(t, expectedNotification.Message, response.Message)
@@ -401,7 +401,7 @@ func TestGetAllNotificationHandlerSuccess(t *testing.T) {
 	expectedNotifications := []*models.Notification{
 		{
 			ID:          "1",
-			UserID:      "",
+			ChatID:      "",
 			Email:       "test1@example.com",
 			Type:        models.NotificationTypeEmail,
 			Message:     "Test message 1",
@@ -413,7 +413,7 @@ func TestGetAllNotificationHandlerSuccess(t *testing.T) {
 		},
 		{
 			ID:          "2",
-			UserID:      "user2",
+			ChatID:      "user2",
 			Email:       "",
 			Type:        models.NotificationTypeTelegram,
 			Message:     "Test message 2",
@@ -441,7 +441,7 @@ func TestGetAllNotificationHandlerSuccess(t *testing.T) {
 
 	for i, expected := range expectedNotifications {
 		assert.Equal(t, expected.ID, response[i].ID)
-		assert.Equal(t, expected.UserID, response[i].UserID)
+		assert.Equal(t, expected.ChatID, response[i].ChatID)
 		assert.Equal(t, expected.Email, response[i].Email)
 		assert.Equal(t, expected.Type, response[i].Type)
 		assert.Equal(t, expected.Message, response[i].Message)
@@ -487,7 +487,7 @@ func TestCancelNotificationHandlerSuccess(t *testing.T) {
 
 	scheduledNotification := &models.Notification{
 		ID:          notificationID,
-		UserID:      "user123",
+		ChatID:      "user123",
 		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
 		Message:     "Test message",
@@ -549,7 +549,7 @@ func TestCancelNotificationHandlerNotScheduled(t *testing.T) {
 
 	processingNotification := &models.Notification{
 		ID:          notificationID,
-		UserID:      "user123",
+		ChatID:      "user123",
 		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
 		Message:     "Test message",
@@ -586,7 +586,7 @@ func TestCancelNotificationHandlerCancelError(t *testing.T) {
 
 	scheduledNotification := &models.Notification{
 		ID:          notificationID,
-		UserID:      "user123",
+		ChatID:      "user123",
 		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
 		Message:     "Test message",

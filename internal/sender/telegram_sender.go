@@ -25,8 +25,8 @@ func (s *TelegramSender) Send(n *models.Notification) error {
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.botToken)
 
 	payload := map[string]string{
-		"chat_id": n.UserID,
-		"text":    n.Message,
+		"chat_id": n.ChatID,
+		"text":    n.TelegramNotification.Message,
 	}
 
 	data, _ := json.Marshal(payload)

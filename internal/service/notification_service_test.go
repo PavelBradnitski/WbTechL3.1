@@ -68,7 +68,7 @@ func TestNotificationServiceCreate(t *testing.T) {
 	service := NewNotificationService(mockRepo)
 
 	req := &models.CreateNotificationRequest{
-		UserID:      "user123",
+		ChatID:      "user123",
 		Message:     "Test message",
 		Subject:     "Test subject",
 		Email:       "test@example.com",
@@ -79,7 +79,7 @@ func TestNotificationServiceCreate(t *testing.T) {
 	expectedID := uuid.NewString()
 	mockRepo.On("Create", mock.Anything, mock.MatchedBy(func(n *models.Notification) bool {
 		// Add assertions to check the Notification object before it's created.
-		return n.UserID == req.UserID &&
+		return n.ChatID == req.ChatID &&
 			n.Message == req.Message &&
 			n.Subject == req.Subject &&
 			n.Email == req.Email &&
@@ -103,7 +103,7 @@ func TestNotificationServiceGet(t *testing.T) {
 	notificationID := "123"
 	expectedNotification := &models.Notification{
 		ID:          notificationID,
-		UserID:      "user123",
+		ChatID:      "user123",
 		Email:       "test@example.com",
 		Type:        models.NotificationTypeEmail,
 		Message:     "Test message",
@@ -130,7 +130,7 @@ func TestNotificationServiceGetAll(t *testing.T) {
 	expectedNotifications := []*models.Notification{
 		{
 			ID:          "1",
-			UserID:      "user1",
+			ChatID:      "user1",
 			Email:       "test1@example.com",
 			Type:        models.NotificationTypeEmail,
 			Message:     "Test message 1",
@@ -142,7 +142,7 @@ func TestNotificationServiceGetAll(t *testing.T) {
 		},
 		{
 			ID:          "2",
-			UserID:      "user2",
+			ChatID:      "user2",
 			Email:       "test2@example.com",
 			Type:        models.NotificationTypeTelegram,
 			Message:     "Test message 2",
@@ -185,7 +185,7 @@ func TestNotificationServiceReservePending(t *testing.T) {
 	expectedNotifications := []*models.Notification{
 		{
 			ID:          "1",
-			UserID:      "user1",
+			ChatID:      "user1",
 			Email:       "test1@example.com",
 			Type:        models.NotificationTypeEmail,
 			Message:     "Test message 1",
@@ -259,7 +259,7 @@ func TestNotificationServiceCreateError(t *testing.T) {
 	service := NewNotificationService(mockRepo)
 
 	req := &models.CreateNotificationRequest{
-		UserID:      "user123",
+		ChatID:      "user123",
 		Message:     "Test message",
 		Subject:     "Test subject",
 		Email:       "test@example.com",

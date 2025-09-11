@@ -56,7 +56,7 @@ func (h *NotificationHandler) create(c *ginext.Context) {
 		return
 	}
 
-	if req.Type == models.NotificationTypeTelegram && req.UserID == "" {
+	if req.Type == models.NotificationTypeTelegram && req.ChatID == "" {
 		c.JSON(http.StatusBadRequest, map[string]any{"error": "user_id is required for telegram notifications"})
 		return
 	}
@@ -78,6 +78,7 @@ func (h *NotificationHandler) create(c *ginext.Context) {
 
 	id, err := h.svc.Create(c.Request.Context(), &req)
 	if err != nil {
+		log.Printf("err: %v\n", err)
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": "failed to create notification"})
 		return
 	}
@@ -93,17 +94,22 @@ func (h *NotificationHandler) get(c *ginext.Context) {
 		c.JSON(http.StatusNotFound, map[string]any{"error": "notification not found"})
 		return
 	}
+	var message string
+	switch n.Type {
+	case "email":
+		message = n.EmailNotification.Message
+	case "telegram":
+		message = n.TelegramNotification.Message
+	}
 	resp := models.NotificationResponse{
 		ID:          n.ID,
-		UserID:      n.UserID,
+		ChatID:      n.ChatID,
 		Email:       n.Email,
 		Type:        n.Type,
-		Message:     n.Message,
+		Message:     message,
 		Subject:     n.Subject,
 		ScheduledAt: n.ScheduledAt,
 		Status:      n.Status,
-		CreatedAt:   n.CreatedAt,
-		UpdatedAt:   n.UpdatedAt,
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -117,17 +123,22 @@ func (h *NotificationHandler) getAll(c *ginext.Context) {
 	}
 	var resp []models.NotificationResponse
 	for _, notif := range n {
+		var message string
+		switch notif.Type {
+		case "email":
+			message = notif.EmailNotification.Message
+		case "telegram":
+			message = notif.TelegramNotification.Message
+		}
 		resp = append(resp, models.NotificationResponse{
 			ID:          notif.ID,
-			UserID:      notif.UserID,
+			ChatID:      notif.ChatID,
 			Email:       notif.Email,
 			Type:        notif.Type,
-			Message:     notif.Message,
+			Message:     message,
 			Subject:     notif.Subject,
 			ScheduledAt: notif.ScheduledAt,
 			Status:      notif.Status,
-			CreatedAt:   notif.CreatedAt,
-			UpdatedAt:   notif.UpdatedAt,
 		})
 	}
 

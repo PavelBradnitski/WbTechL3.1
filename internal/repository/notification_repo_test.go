@@ -25,7 +25,7 @@ func TestNotificationRepo_Create(t *testing.T) {
 		repo := NewNotificationRepo(db)
 
 		req := &models.Notification{
-			UserID:      "user123",
+			ChatID:      "user123",
 			Email:       "test@example.com",
 			Type:        "email",
 			Message:     "Test message",
@@ -40,7 +40,7 @@ func TestNotificationRepo_Create(t *testing.T) {
    VALUES ($1, $2, $3, $4, $5, $6, 'pending', 0, now(), now())
    RETURNING id
   `)).
-			WithArgs(req.UserID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
+			WithArgs(req.ChatID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(expectedID))
 
 		id, err := repo.Create(context.Background(), req)
@@ -63,7 +63,7 @@ func TestNotificationRepo_Create(t *testing.T) {
 		repo := NewNotificationRepo(db)
 
 		req := &models.Notification{
-			UserID:      "user123",
+			ChatID:      "user123",
 			Email:       "test@example.com",
 			Type:        "email",
 			Message:     "Test message",
@@ -76,7 +76,7 @@ func TestNotificationRepo_Create(t *testing.T) {
    VALUES ($1, $2, $3, $4, $5, $6, 'pending', 0, now(), now())
    RETURNING id
   `)).
-			WithArgs(req.UserID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
+			WithArgs(req.ChatID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
 			WillReturnError(errors.New("database error"))
 
 		id, err := repo.Create(context.Background(), req)
@@ -99,7 +99,7 @@ func TestNotificationRepo_Create(t *testing.T) {
 		repo := NewNotificationRepo(db)
 
 		req := &models.Notification{
-			UserID:      "user123",
+			ChatID:      "user123",
 			Email:       "test@example.com",
 			Type:        "email",
 			Message:     "Test message",
@@ -112,7 +112,7 @@ func TestNotificationRepo_Create(t *testing.T) {
         VALUES ($1, $2, $3, $4, $5, $6, 'pending', 0, now(), now())
         RETURNING id
     `)).
-			WithArgs(req.UserID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
+			WithArgs(req.ChatID, req.Email, req.Type, req.Message, req.Subject, req.ScheduledAt).
 			WillReturnError(sql.ErrNoRows)
 
 		id, err := repo.Create(context.Background(), req)
@@ -139,7 +139,7 @@ func TestNotificationRepo_GetByID(t *testing.T) {
 		notificationID := "notification123"
 		expectedNotification := &models.Notification{
 			ID:          notificationID,
-			UserID:      "user123",
+			ChatID:      "user123",
 			Email:       "test@example.com",
 			Type:        "email",
 			Message:     "Test message",
@@ -154,7 +154,7 @@ func TestNotificationRepo_GetByID(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "user_id", "email", "type", "message", "subject", "status", "scheduled_at", "retries", "created_at", "updated_at"}).
 			AddRow(
 				expectedNotification.ID,
-				expectedNotification.UserID,
+				expectedNotification.ChatID,
 				expectedNotification.Email,
 				expectedNotification.Type,
 				expectedNotification.Message,
@@ -255,7 +255,7 @@ func TestNotificationRepo_GetAll(t *testing.T) {
 		expectedNotifications := []*models.Notification{
 			{
 				ID:          "notification1",
-				UserID:      "user1",
+				ChatID:      "user1",
 				Email:       "test1@example.com",
 				Type:        "email",
 				Message:     "Message 1",
@@ -268,7 +268,7 @@ func TestNotificationRepo_GetAll(t *testing.T) {
 			},
 			{
 				ID:          "notification2",
-				UserID:      "user2",
+				ChatID:      "user2",
 				Email:       "test2@example.com",
 				Type:        "sms",
 				Message:     "Message 2",
@@ -285,7 +285,7 @@ func TestNotificationRepo_GetAll(t *testing.T) {
 		for _, n := range expectedNotifications {
 			rows.AddRow(
 				n.ID,
-				n.UserID,
+				n.ChatID,
 				n.Email,
 				n.Type,
 				n.Message,
@@ -488,7 +488,7 @@ func TestNotificationRepo_ReservePending(t *testing.T) {
 		expectedNotifications := []*models.Notification{
 			{
 				ID:          "notification1",
-				UserID:      "user1",
+				ChatID:      "user1",
 				Email:       "test1@example.com",
 				Type:        "email",
 				Message:     "Message 1",
@@ -501,7 +501,7 @@ func TestNotificationRepo_ReservePending(t *testing.T) {
 			},
 			{
 				ID:          "notification2",
-				UserID:      "user2",
+				ChatID:      "user2",
 				Email:       "test2@example.com",
 				Type:        "sms",
 				Message:     "Message 2",
@@ -518,7 +518,7 @@ func TestNotificationRepo_ReservePending(t *testing.T) {
 		for _, n := range expectedNotifications {
 			rows.AddRow(
 				n.ID,
-				n.UserID,
+				n.ChatID,
 				n.Email,
 				n.Type,
 				n.Message,

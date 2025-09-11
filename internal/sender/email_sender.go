@@ -34,7 +34,7 @@ func (s *EmailSender) Send(n *models.Notification) error {
 	m.SetHeader("From", s.from)
 	m.SetHeader("To", n.Email)
 	m.SetHeader("Subject", n.Subject)
-	m.SetBody("text/plain", n.Message)
+	m.SetBody("text/plain", n.EmailNotification.Message)
 
 	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
 	d.SSL = false // MailHog не использует TLS

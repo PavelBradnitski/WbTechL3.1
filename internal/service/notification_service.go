@@ -30,16 +30,33 @@ func NewNotificationService(repo repository.NotificationRepository) Notification
 
 // Create создает новое уведомление.
 func (s *notificationService) Create(ctx context.Context, req *models.CreateNotificationRequest) (string, error) {
-	n := &models.Notification{
-		ID:          uuid.NewString(),
-		UserID:      req.UserID,
-		Message:     req.Message,
-		Subject:     req.Subject,
-		Email:       req.Email,
-		Type:        req.Type,
-		ScheduledAt: req.ScheduledAt,
-		Status:      "scheduled",
-		Retries:     0,
+	var n *models.Notification
+	switch req.Type {
+	case "email":
+		n = &models.Notification{
+			ID:          uuid.NewString(),
+			Type:        req.Type,
+			ScheduledAt: req.ScheduledAt,
+			Status:      "scheduled",
+			Retries:     0,
+			EmailNotification: &models.EmailNotification{
+				Email:   req.Email,
+				Message: req.Message,
+				Subject: req.Subject,
+			},
+		}
+	case "telegram":
+		n = &models.Notification{
+			ID:          uuid.NewString(),
+			Type:        req.Type,
+			ScheduledAt: req.ScheduledAt,
+			Status:      "scheduled",
+			Retries:     0,
+			TelegramNotification: &models.TelegramNotification{
+				ChatID:  req.ChatID,
+				Message: req.Message,
+			},
+		}
 	}
 	return s.repo.Create(ctx, n)
 }

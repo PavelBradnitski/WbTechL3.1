@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/wb-go/wbf/ginext"
@@ -215,7 +216,7 @@ func TestCreateNotificationHandlerMissingChatID(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "user_id is required for telegram notifications", response["error"])
+	assert.Equal(t, "chat_id is required for telegram notifications", response["error"])
 
 	mockService.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
@@ -352,16 +353,22 @@ func TestGetNotificationHandlerSuccess(t *testing.T) {
 	var response models.NotificationResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-
-	assert.Equal(t, expectedNotification.ID, response.ID)
-	assert.Equal(t, expectedNotification.TelegramNotification.ChatID, response.ChatID)
-	assert.Equal(t, expectedNotification.EmailNotification, response.Email)
-	assert.Equal(t, expectedNotification.Type, response.Type)
-	assert.Equal(t, expectedNotification.EmailNotification.Message, response.Message)
-	assert.Equal(t, expectedNotification.EmailNotification.Subject, response.Subject)
-	assert.True(t, expectedNotification.ScheduledAt.Truncate(time.Second).Equal(response.ScheduledAt.Truncate(time.Second)), "CreatedAt times are not equal")
-	assert.Equal(t, expectedNotification.Status, response.Status)
-
+	switch response.Type {
+	case models.NotificationTypeEmail:
+		assert.Equal(t, expectedNotification.ID, response.ID)
+		assert.Equal(t, expectedNotification.EmailNotification.Email, response.Email)
+		assert.Equal(t, expectedNotification.EmailNotification.Message, response.Message)
+		assert.Equal(t, expectedNotification.EmailNotification.Subject, response.Subject)
+		assert.Equal(t, expectedNotification.Type, response.Type)
+		assert.True(t, expectedNotification.ScheduledAt.Truncate(time.Second).Equal(response.ScheduledAt.Truncate(time.Second)), "CreatedAt times are not equal")
+		assert.Equal(t, expectedNotification.Status, response.Status)
+	case models.NotificationTypeTelegram:
+		assert.Equal(t, expectedNotification.ID, response.ID)
+		assert.Equal(t, expectedNotification.TelegramNotification.ChatID, response.ChatID)
+		assert.Equal(t, expectedNotification.Type, response.Type)
+		assert.True(t, expectedNotification.ScheduledAt.Truncate(time.Second).Equal(response.ScheduledAt.Truncate(time.Second)), "CreatedAt times are not equal")
+		assert.Equal(t, expectedNotification.Status, response.Status)
+	}
 	mockService.AssertExpectations(t)
 }
 
@@ -481,139 +488,143 @@ func TestGetAllNotificationHandlerNotFound(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-// func TestCancelNotificationHandlerSuccess(t *testing.T) {
-// 	mockService := new(MockNotificationService)
-// 	handler := &NotificationHandler{svc: mockService}
-// 	router := gin.New()
-// 	router.POST("/notify/:id/cancel", handler.cancel)
+func TestCancelNotificationHandlerSuccess(t *testing.T) {
+	mockService := new(MockNotificationService)
+	handler := &NotificationHandler{svc: mockService}
+	router := ginext.New()
+	router.POST("/notify/:id/cancel", handler.cancel)
 
-// 	notificationID := "123"
+	notificationID := "123"
 
-// 	scheduledNotification := &models.Notification{
-// 		ID:          notificationID,
-// 		ChatID:      "user123",
-// 		Email:       "test@example.com",
-// 		Type:        models.NotificationTypeEmail,
-// 		Message:     "Test message",
-// 		Subject:     "Test subject",
-// 		ScheduledAt: time.Now().Add(time.Hour),
-// 		Status:      models.StatusScheduled,
-// 		CreatedAt:   time.Now(),
-// 		UpdatedAt:   time.Now(),
-// 	}
+	scheduledNotification := &models.Notification{
+		ID:          "1",
+		Type:        models.NotificationTypeEmail,
+		ScheduledAt: time.Now().Add(time.Hour),
+		Status:      models.StatusScheduled,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		EmailNotification: &models.EmailNotification{
+			Email:   "test1@example.com",
+			Message: "Test message 1",
+			Subject: "Test subject 1",
+		},
+	}
 
-// 	mockService.On("Get", mock.Anything, notificationID).Return(scheduledNotification, nil)
-// 	mockService.On("Cancel", mock.Anything, notificationID).Return(nil)
+	mockService.On("Get", mock.Anything, notificationID).Return(scheduledNotification, nil)
+	mockService.On("Cancel", mock.Anything, notificationID).Return(nil)
 
-// 	w := httptest.NewRecorder()
-// 	req, _ := http.NewRequest("POST", "/notify/"+notificationID+"/cancel", nil)
-// 	router.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/notify/"+notificationID+"/cancel", nil)
+	router.ServeHTTP(w, req)
 
-// 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 
-// 	var response map[string]interface{}
-// 	err := json.Unmarshal(w.Body.Bytes(), &response)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "canceled", response["status"])
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "canceled", response["status"])
 
-// 	mockService.AssertExpectations(t)
-// }
+	mockService.AssertExpectations(t)
+}
 
-// func TestCancelNotificationHandlerNotFound(t *testing.T) {
-// 	mockService := new(MockNotificationService)
-// 	handler := &NotificationHandler{svc: mockService}
-// 	router := ginext.New()
-// 	router.DELETE("/notify/:id", handler.cancel)
+func TestCancelNotificationHandlerNotFound(t *testing.T) {
+	mockService := new(MockNotificationService)
+	handler := &NotificationHandler{svc: mockService}
+	router := ginext.New()
+	router.DELETE("/notify/:id", handler.cancel)
 
-// 	notificationID := "123"
+	notificationID := "123"
 
-// 	mockService.On("Get", mock.Anything, notificationID).Return(nil, assert.AnError)
+	mockService.On("Get", mock.Anything, notificationID).Return(nil, assert.AnError)
 
-// 	w := httptest.NewRecorder()
-// 	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
-// 	router.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
+	router.ServeHTTP(w, req)
 
-// 	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
-// 	var response map[string]interface{}
-// 	err := json.Unmarshal(w.Body.Bytes(), &response)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "notification not found", response["error"])
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "notification not found", response["error"])
 
-// 	mockService.AssertExpectations(t)
-// }
+	mockService.AssertExpectations(t)
+}
 
-// func TestCancelNotificationHandlerNotScheduled(t *testing.T) {
-// 	mockService := new(MockNotificationService)
-// 	handler := &NotificationHandler{svc: mockService}
-// 	router := ginext.New()
-// 	router.DELETE("/notify/:id", handler.cancel)
+func TestCancelNotificationHandlerNotScheduled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-// 	notificationID := "123"
+	mockService := new(MockNotificationService)
+	handler := &NotificationHandler{svc: mockService}
+	router := ginext.New()
+	router.DELETE("/notify/:id", handler.cancel)
 
-// 	processingNotification := &models.Notification{
-// 		ID:          notificationID,
-// 		ChatID:      "user123",
-// 		Email:       "test@example.com",
-// 		Type:        models.NotificationTypeEmail,
-// 		Message:     "Test message",
-// 		Subject:     "Test subject",
-// 		ScheduledAt: time.Now().Add(time.Hour),
-// 		Status:      models.StatusProcessing,
-// 		CreatedAt:   time.Now(),
-// 		UpdatedAt:   time.Now(),
-// 	}
+	notificationID := "123"
+	processingNotification := &models.Notification{
+		ID:          "1",
+		Type:        models.NotificationTypeEmail,
+		ScheduledAt: time.Now().Add(time.Hour),
+		Status:      models.StatusProcessing,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		EmailNotification: &models.EmailNotification{
+			Email:   "test1@example.com",
+			Message: "Test message 1",
+			Subject: "Test subject 1",
+		},
+	}
 
-// 	mockService.On("Get", mock.Anything, notificationID).Return(processingNotification, nil)
+	mockService.On("Get", mock.Anything, notificationID).Return(processingNotification, nil)
 
-// 	w := httptest.NewRecorder()
-// 	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
-// 	router.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
+	router.ServeHTTP(w, req)
 
-// 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-// 	var response map[string]interface{}
-// 	err := json.Unmarshal(w.Body.Bytes(), &response)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "only scheduled notifications can be canceled", response["error"])
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "only scheduled notifications can be canceled", response["error"])
 
-// 	mockService.AssertExpectations(t)
-// }
+	mockService.AssertExpectations(t)
+}
 
-// func TestCancelNotificationHandlerCancelError(t *testing.T) {
-// 	mockService := new(MockNotificationService)
-// 	handler := &NotificationHandler{svc: mockService}
-// 	router := ginext.New()
-// 	router.DELETE("/notify/:id", handler.cancel)
+func TestCancelNotificationHandlerCancelError(t *testing.T) {
+	mockService := new(MockNotificationService)
+	handler := &NotificationHandler{svc: mockService}
+	router := ginext.New()
+	router.DELETE("/notify/:id", handler.cancel)
 
-// 	notificationID := "123"
+	notificationID := "123"
 
-// 	scheduledNotification := &models.Notification{
-// 		ID:          notificationID,
-// 		ChatID:      "user123",
-// 		Email:       "test@example.com",
-// 		Type:        models.NotificationTypeEmail,
-// 		Message:     "Test message",
-// 		Subject:     "Test subject",
-// 		ScheduledAt: time.Now().Add(time.Hour),
-// 		Status:      models.StatusScheduled,
-// 		CreatedAt:   time.Now(),
-// 		UpdatedAt:   time.Now(),
-// 	}
+	scheduledNotification := &models.Notification{
+		ID:          "1",
+		Type:        models.NotificationTypeEmail,
+		ScheduledAt: time.Now().Add(time.Hour),
+		Status:      models.StatusScheduled,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		EmailNotification: &models.EmailNotification{
+			Email:   "test1@example.com",
+			Message: "Test message 1",
+			Subject: "Test subject 1",
+		},
+	}
 
-// 	mockService.On("Get", mock.Anything, notificationID).Return(scheduledNotification, nil)
-// 	mockService.On("Cancel", mock.Anything, notificationID).Return(assert.AnError)
+	mockService.On("Get", mock.Anything, notificationID).Return(scheduledNotification, nil)
+	mockService.On("Cancel", mock.Anything, notificationID).Return(assert.AnError)
 
-// 	w := httptest.NewRecorder()
-// 	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
-// 	router.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/notify/"+notificationID, nil)
+	router.ServeHTTP(w, req)
 
-// 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-// 	var response map[string]interface{}
-// 	err := json.Unmarshal(w.Body.Bytes(), &response)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, assert.AnError.Error(), response["error"]) // Verifies the error message
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, assert.AnError.Error(), response["error"]) // Verifies the error message
 
-// 	mockService.AssertExpectations(t)
-// }
+	mockService.AssertExpectations(t)
+}

@@ -36,8 +36,11 @@ func (r *notificationRepo) Create(ctx context.Context, req *models.Notification)
 	if err != nil {
 		return "", fmt.Errorf("error starting transaction: %w", err)
 	}
-	defer tx.Rollback() // Откат транзакции в случае ошибки
-
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 	// 1. Вставляем данные в таблицу notifications
 	notificationQuery := `
   INSERT INTO notifications (type, status, scheduled_at, retries)

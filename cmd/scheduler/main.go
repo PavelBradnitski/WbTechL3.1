@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 	"github.com/joho/godotenv"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/rabbitmq"
+	"github.com/wb-go/wbf/redis"
 )
 
 func init() {
@@ -44,6 +47,20 @@ func main() {
 
 	// сервис
 	svc := service.NewNotificationService(repo)
+
+	// подключение к Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisClient := redis.New(redisAddr, "", 0)
+	// main scheduler
+	statusCache := statuscache.New(redisClient)
+	ctx := context.Background()
+	// проверим соединение
+	if err := redisClient.Set(ctx, "scheduler:ping", "ok"); err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
 	// создаём планировщик
 	url := os.Getenv("RABBITMQ_URL")
 	if url == "" {
@@ -53,7 +70,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	scheduler, err := service.NewNotificationScheduler(svc, rabbit, "notifications", 5*time.Second)
+	scheduler, err := service.NewNotificationScheduler(svc, rabbit, statusCache, "notifications", 5*time.Second)
 	if err != nil {
 		log.Fatalf("failed to create scheduler: %v", err)
 	}

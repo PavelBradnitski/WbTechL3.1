@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -10,9 +11,11 @@ import (
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/sender"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 	"github.com/joho/godotenv"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/rabbitmq"
+	"github.com/wb-go/wbf/redis"
 )
 
 func init() {
@@ -51,6 +54,18 @@ func main() {
 	// сервис
 	svc := service.NewNotificationService(repo)
 
+	// подключаем Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "redis:6379"
+	}
+	redisClient := redis.New(redisAddr, "", 0)
+	statusCache := statuscache.New(redisClient)
+	ctx := context.Background()
+	if err := redisClient.Set(ctx, "worker:ping", "ok"); err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
+
 	fmt.Println("Worker started...")
 	rabbit, err := rabbitmq.Connect(url, 5, 5*time.Second)
 	if err != nil {
@@ -74,6 +89,6 @@ func main() {
 
 	sender := sender.NewMultiSender(emailSender, telegramSender)
 
-	worker := service.NewWorker(channel, sender, svc)
+	worker := service.NewWorker(channel, sender, svc, statusCache)
 	worker.Start()
 }

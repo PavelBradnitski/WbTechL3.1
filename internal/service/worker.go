@@ -9,6 +9,7 @@ import (
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/sender"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 
 	"github.com/wb-go/wbf/rabbitmq"
 	"github.com/wb-go/wbf/retry"
@@ -16,14 +17,15 @@ import (
 
 // Worker отвечает за получение сообщений из очереди и обработку уведомлений.
 type Worker struct {
-	channel *rabbitmq.Channel
-	sender  sender.Sender
-	service NotificationService
+	channel     *rabbitmq.Channel
+	sender      sender.Sender
+	service     NotificationService
+	statusCache *statuscache.Cache
 }
 
 // NewWorker создает новый экземпляр Worker.
-func NewWorker(channel *rabbitmq.Channel, sender sender.Sender, svc NotificationService) *Worker {
-	return &Worker{channel: channel, sender: sender, service: svc}
+func NewWorker(channel *rabbitmq.Channel, sender sender.Sender, svc NotificationService, cache *statuscache.Cache) *Worker {
+	return &Worker{channel: channel, sender: sender, service: svc, statusCache: cache}
 }
 
 // Start запускает обработку сообщений из очереди.
@@ -78,6 +80,11 @@ func (w *Worker) Start() {
 				if err := w.service.UpdateStatus(ctx, n.ID, models.StatusFailed); err != nil {
 					log.Printf("failed to update status for id=%v: %v", n.ID, err)
 				}
+				// сохраняем статус в Redis
+				err = w.statusCache.SetStatus(ctx, n.ID, models.StatusFailed)
+				if err != nil {
+					log.Printf("failed to set status in redis for id=%v: %v", n.ID, err)
+				}
 				// удаляем из очереди, чтобы не зацикливать
 				if err := d.Ack(false); err != nil {
 					log.Printf("failed to ack message id=%v: %v", n.ID, err)
@@ -112,6 +119,11 @@ func (w *Worker) Start() {
 			log.Printf("processing failed for id=%v after retries: %v", n.ID, err)
 			// помечаем как failed в БД, чтобы не брать в работу
 			w.service.UpdateStatus(ctx, n.ID, models.StatusFailed)
+			// сохраняем статус в Redis
+			err = w.statusCache.SetStatus(ctx, n.ID, models.StatusFailed)
+			if err != nil {
+				log.Printf("failed to set status in redis for id=%v: %v", n.ID, err)
+			}
 			// удаляем из очереди, чтобы не зацикливать
 			if err := d.Nack(false, false); err != nil {
 				log.Printf("failed to nack message id=%v: %v", n.ID, err)
@@ -121,6 +133,11 @@ func (w *Worker) Start() {
 
 		if err := w.service.UpdateStatus(ctx, n.ID, models.StatusSent); err != nil {
 			log.Printf("failed to mark notification %v as sent: %v", n.ID, err)
+		}
+		// сохраняем статус в Redis
+		err = w.statusCache.SetStatus(ctx, n.ID, models.StatusSent)
+		if err != nil {
+			log.Printf("failed to set status in redis for id=%v: %v", n.ID, err)
 		}
 		// подтверждаем успешную обработку
 		if err := d.Ack(false); err != nil {

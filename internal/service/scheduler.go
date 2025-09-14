@@ -7,6 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 	"github.com/wb-go/wbf/rabbitmq"
 )
 
@@ -18,16 +20,17 @@ type Scheduler interface {
 
 // NotificationScheduler отвечает за периодическую проверку базы данных на наличие новых уведомлений
 type NotificationScheduler struct {
-	svc       NotificationService
-	publisher *rabbitmq.Publisher
-	queueName string
-	interval  time.Duration
-	ctx       context.Context
-	cancel    context.CancelFunc
+	svc         NotificationService
+	publisher   *rabbitmq.Publisher
+	statusCache *statuscache.Cache
+	queueName   string
+	interval    time.Duration
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // NewNotificationScheduler создает новый экземпляр NotificationScheduler.
-func NewNotificationScheduler(svc NotificationService, conn *rabbitmq.Connection, queueName string, interval time.Duration) (*NotificationScheduler, error) {
+func NewNotificationScheduler(svc NotificationService, conn *rabbitmq.Connection, statusCache *statuscache.Cache, queueName string, interval time.Duration) (*NotificationScheduler, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ch, err := conn.Channel()
@@ -59,12 +62,13 @@ func NewNotificationScheduler(svc NotificationService, conn *rabbitmq.Connection
 	pub := rabbitmq.NewPublisher(ch, exchange.Name())
 
 	return &NotificationScheduler{
-		svc:       svc,
-		publisher: pub,
-		queueName: queueName,
-		interval:  interval,
-		ctx:       ctx,
-		cancel:    cancel,
+		svc:         svc,
+		publisher:   pub,
+		statusCache: statusCache,
+		queueName:   queueName,
+		interval:    interval,
+		ctx:         ctx,
+		cancel:      cancel,
 	}, nil
 }
 
@@ -118,6 +122,11 @@ func (s *NotificationScheduler) processPending() {
 		if err != nil {
 			log.Printf("scheduler: failed to publish notification %v: %v", n.ID, err)
 			continue
+		}
+
+		// сохраняем статус в Redis
+		if err := s.statusCache.SetStatus(s.ctx, n.ID, models.StatusProcessing); err != nil {
+			log.Printf("failed to set status in redis for id=%v: %v", n.ID, err)
 		}
 	}
 }

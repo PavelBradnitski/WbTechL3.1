@@ -139,10 +139,11 @@ func (r *notificationRepo) GetByID(ctx context.Context, id string) (*models.Noti
 	return &n, nil
 }
 
+// GetAll возвращает все уведомления из базы данных.
 func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, error) {
 	notifications := []*models.Notification{}
 
-	// 1. Получаем базовую информацию из таблицы notifications
+	// Получаем базовую информацию из таблицы notifications
 	notificationQuery := `
         SELECT id, type, status, scheduled_at, retries
         FROM notifications
@@ -153,7 +154,6 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 	}
 	defer rows.Close()
 
-	// Итерируемся по результатам запроса notifications
 	for rows.Next() {
 		var notif models.Notification
 		err := rows.Scan(
@@ -163,7 +163,7 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 			return nil, fmt.Errorf("error scanning notification: %w", err)
 		}
 
-		// 2. Получаем дополнительную информацию в зависимости от типа уведомления
+		// Получаем дополнительные детали в зависимости от типа
 		switch notif.Type {
 		case "email":
 			notif.EmailNotification = &models.EmailNotification{}
@@ -200,6 +200,11 @@ func (r *notificationRepo) GetAll(ctx context.Context) ([]*models.Notification, 
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating through rows: %w", err)
+	}
+
+	// Если уведомлений нет — возвращаем ErrNotFound
+	if len(notifications) == 0 {
+		return nil, ErrNotFound
 	}
 
 	return notifications, nil

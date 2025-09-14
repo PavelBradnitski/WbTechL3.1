@@ -6,19 +6,22 @@ import (
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 	"github.com/wb-go/wbf/ginext"
 )
 
 // NotificationHandler для работы с уведомлениями
 type NotificationHandler struct {
-	svc service.NotificationService
+	svc         service.NotificationService
+	statusCache *statuscache.Cache
 }
 
 // NewNotificationHandler создает новый обработчик уведомлений и регистрирует маршруты
-func NewNotificationHandler(r *ginext.Engine, svc service.NotificationService, frontendURL string) {
+func NewNotificationHandler(r *ginext.Engine, svc service.NotificationService, frontendURL string, cache *statuscache.Cache) {
 	log.Printf("Frontend URL: %s\n", frontendURL)
-	h := &NotificationHandler{svc: svc}
+	h := &NotificationHandler{svc: svc, statusCache: cache}
 	// CORS middleware
 	r.Use(func(c *ginext.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", frontendURL)
@@ -82,50 +85,66 @@ func (h *NotificationHandler) create(c *ginext.Context) {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": "failed to create notification"})
 		return
 	}
+	// add  to redis cache
+	if h.statusCache != nil {
+		err = h.statusCache.SetStatus(c.Request.Context(), id, models.StatusScheduled)
+		if err != nil {
+			log.Printf("failed to set status in redis for id=%v: %v", id, err)
+		}
+	}
 
 	c.JSON(http.StatusOK, models.CreateNotificationResponse{ID: id})
 }
 
-// get хендлер для получения уведомления по ID.
 func (h *NotificationHandler) get(c *ginext.Context) {
 	id := c.Param("id")
-	n, err := h.svc.Get(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, map[string]any{"error": "notification not found"})
-		return
-	}
-	var resp models.NotificationResponse
-	switch n.Type {
-	case models.NotificationTypeEmail:
-		resp = models.NotificationResponse{
-			ID:          n.ID,
-			Email:       n.EmailNotification.Email,
-			Type:        n.Type,
-			Message:     n.EmailNotification.Message,
-			Subject:     n.EmailNotification.Subject,
-			ScheduledAt: n.ScheduledAt,
-			Status:      n.Status,
-			Retries:     n.Retries,
-		}
-	case models.NotificationTypeTelegram:
-		resp = models.NotificationResponse{
-			ID:          n.ID,
-			ChatID:      n.TelegramNotification.ChatID,
-			Type:        n.Type,
-			Message:     n.TelegramNotification.Message,
-			ScheduledAt: n.ScheduledAt,
-			Status:      n.Status,
-			Retries:     n.Retries,
+	ctx := c.Request.Context()
+
+	var status models.Status
+
+	// пробуем сначала из Redis
+	if h.statusCache != nil {
+		s, err := h.statusCache.GetStatus(ctx, id)
+		if err == nil {
+			log.Printf("Cache hit for notification %s: status=%s\n", id, s)
+			status = s
 		}
 	}
-	c.JSON(http.StatusOK, resp)
+
+	// если нет в Redis — берём из БД
+	if status == "" {
+		n, err := h.svc.Get(ctx, id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, map[string]any{"error": "notification not found"})
+			return
+		}
+		status = n.Status
+
+		// обновляем Redis для будущих запросов
+		if h.statusCache != nil {
+			_ = h.statusCache.SetStatus(ctx, id, status)
+		}
+	}
+
+	c.JSON(http.StatusOK, map[string]string{
+		"status": string(status),
+	})
 }
 
-// getAll хендлер для получения всех уведомлений.
+// getAll хендлер для получения всех уведомлений. (метод для фронтенда)
 func (h *NotificationHandler) getAll(c *ginext.Context) {
 	n, err := h.svc.GetAll(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusNotFound, map[string]any{"error": "notifications not found"})
+		// если уведомлений нет, возвращаем пустой массив
+		if err == repository.ErrNotFound {
+			c.JSON(http.StatusOK, []models.NotificationResponse{})
+			return
+		}
+
+		// любая другая ошибка — Internal Server Error
+		c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
 		return
 	}
 	var resp []models.NotificationResponse
@@ -177,6 +196,12 @@ func (h *NotificationHandler) cancel(c *ginext.Context) {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
-
+	// update redis cache
+	if h.statusCache != nil {
+		err = h.statusCache.SetStatus(c.Request.Context(), id, models.StatusCanceled)
+		if err != nil {
+			log.Printf("failed to set status in redis for id=%v: %v", id, err)
+		}
+	}
 	c.JSON(http.StatusOK, map[string]any{"status": "canceled"})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
@@ -9,10 +10,12 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/wb-go/wbf/ginext"
+	"github.com/wb-go/wbf/redis"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/handler"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/PavelBradnitski/WbTechL3.1/internal/service"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/statuscache"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -75,8 +78,21 @@ func main() {
 	// http engine
 	r := ginext.New()
 
+	// подключение к Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisClient := redis.New(redisAddr, "", 0)
+	// main scheduler
+	statusCache := statuscache.New(redisClient)
+	ctx := context.Background()
+	// проверим соединение
+	if err := redisClient.Set(ctx, "scheduler:ping", "ok"); err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
 	// хендлеры
-	handler.NewNotificationHandler(r, svc, frontendURL)
+	handler.NewNotificationHandler(r, svc, frontendURL, statusCache)
 
 	// запуск сервера
 	addr := ":8081"

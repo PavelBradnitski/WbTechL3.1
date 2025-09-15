@@ -454,9 +454,11 @@ func TestNotificationRepo_GetAll(t *testing.T) {
 		notifications, err := repo.GetAll(context.Background())
 
 		// Проверяем результаты
-		assert.NoError(t, err)
-		assert.Empty(t, notifications)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrNotFound)
+		assert.Nil(t, notifications)
 		assert.NoError(t, mock.ExpectationsWereMet())
+
 	})
 
 	t.Run("DBError_QueryNotifications", func(t *testing.T) {

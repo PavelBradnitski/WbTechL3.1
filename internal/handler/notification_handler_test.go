@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PavelBradnitski/WbTechL3.1/internal/models"
+	"github.com/PavelBradnitski/WbTechL3.1/internal/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -467,23 +468,26 @@ func TestGetAllNotificationHandlerSuccess(t *testing.T) {
 }
 
 func TestGetAllNotificationHandlerNotFound(t *testing.T) {
+	// Setup
 	mockService := new(MockNotificationService)
 	handler := &NotificationHandler{svc: mockService}
 	router := ginext.New()
 	router.GET("/notify", handler.getAll)
 
-	mockService.On("GetAll", mock.Anything).Return([]*models.Notification{}, assert.AnError)
+	mockService.On("GetAll", mock.Anything).Return([]*models.Notification{}, repository.ErrNotFound)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/notify", nil)
+
+	// Act
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNotFound, w.Code)
-
-	var response map[string]interface{}
+	// Assert
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response []models.NotificationResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "notifications not found", response["error"])
+	assert.Empty(t, response)
 
 	mockService.AssertExpectations(t)
 }
